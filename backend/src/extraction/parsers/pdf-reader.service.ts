@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
+const { PDFParse } = require("pdf-parse");
 
 @Injectable()
 export class PdfReaderService {
@@ -8,7 +8,9 @@ export class PdfReaderService {
 
   async extractText(buffer: Buffer): Promise<string> {
     try {
-      const data = await pdfParse(buffer);
+      const parser = new PDFParse({ data: buffer });
+      const data = await parser.getText();
+      await parser.destroy();
       const text = data.text?.trim() || "";
 
       if (text.length < 50) {
