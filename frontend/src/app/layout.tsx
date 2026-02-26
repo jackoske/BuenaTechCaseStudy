@@ -17,7 +17,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply saved theme before first paint to prevent flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('theme')||'dark';document.documentElement.classList.add(t)}catch(_){}`,
+          }}
+        />
+      </head>
       <body className={`${inter.className} antialiased`}>
         <div className="flex h-screen bg-background">
           <Sidebar />
