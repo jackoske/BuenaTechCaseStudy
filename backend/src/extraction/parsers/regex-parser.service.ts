@@ -17,7 +17,7 @@ export class RegexParserService {
     try {
       const property = this.parseProperty(text);
       const buildings = this.parseBuildings(text);
-      const units = this.parseUnits(text, buildings);
+      const units = this.parseUnits(text);
 
       const fieldConfidence = this.buildConfidence(property, buildings, units, text);
       const confidence = this.calculateConfidence(fieldConfidence);
@@ -32,51 +32,94 @@ export class RegexParserService {
     }
   }
 
+  // ─── Property ───────────────────────────────────────────────────────────────
+
   private parseProperty(text: string): PropertyData {
     return {
       name: this.extract(text, [
-        /Liegenschaft[:\s]+(.+)/i,
-        /Objekt[:\s]+(.+)/i,
-        /Grundst[üu]ck[:\s]+(.+)/i,
-        /Bezeichnung[:\s]+(.+)/i,
+        // „Name" in German quote marks
+        /unter dem Namen\s*„([^"\n]+)/i,
+        /Bezeichnung[:\s]+„([^"\n]+)/i,
+        /Objekt[:\s]+„([^"\n]+)/i,
+        /Liegenschaft[:\s]+„([^"\n]+)/i,
       ]) || "",
+
       number: this.extract(text, [
-        /(?:Objekt|Liegenschaft|Haus)[-\s]?(?:Nr|Nummer)[.:\s]+([A-Z0-9./-]+)/i,
+        /Objektnummer\s+([A-Z0-9./-]+)/i,
+        /Objekt[-\s]?(?:Nr|Nummer)[.:\s]+([A-Z0-9./-]+)/i,
         /Nr\.[:\s]+([A-Z0-9./-]+)/i,
       ]) || "",
-      managementType: /Mietverwaltung|MV\b/i.test(text) ? "MV" : "WEG",
-      propertyManager: this.extract(text, [
-        /(?:Verwalter|Hausverwaltung|Verwaltung)[:\s]+(.+?)(?:\n|GmbH|AG|KG)/i,
-        /Verwalter[:\s]+(.+)/i,
+
+      managementType: /Mietverwaltung|Verwaltungstyp\s+MV\b/i.test(text) ? "MV" : "WEG",
+
+      propertyManager: this.extractCompany(text, [
+        // "ward bestellt „CompanyName Musterstraße"  →  stop before street
+        /ward bestellt\s*„+([^,\n"„]+?)(?=\s+\w+(?:straße|allee|weg|platz|gasse|damm|ring|chaussee)\b|\s*,)/i,
+        /(?:Verwalter|Hausverwaltung)[:\s]+„([^,\n"„]+)/i,
       ]) || "",
+
       accountant: this.extract(text, [
-        /(?:Buchhalter|Buchf[üu]hrung|Steuerberatung|Wirtschaftspr[üu]fer)[:\s]+(.+)/i,
+        // closing quote may appear before the street; capture up to the quote then match street
+        /beauftragt\s*„+([^„"\n]+)[""]?\s+\w+(?:straße|allee|weg|platz|gasse|damm|ring|chaussee)/i,
+        /(?:Buchhalter|Buchf[üu]hrung|Steuerberatung|Wirtschaftspr[üu]fer)[:\s]+(.+?)(?:\n|$)/i,
       ]) || "",
     };
   }
 
+  // ─── Buildings ──────────────────────────────────────────────────────────────
+
   private parseBuildings(text: string): BuildingData[] {
     const buildings: BuildingData[] = [];
 
-    // Try to find address patterns
-    const addressPattern = /([A-Za-zäöüÄÖÜß\s-]+(?:straße|gasse|weg|allee|platz|damm|ring|chaussee))\s+(\d+[a-z]?)/gi;
-    const addressMatches = [...text.matchAll(addressPattern)];
+    // Find "(\d+) Gebäude \d+ (Name)" section headers
+    const headerPattern = /\(\d+\)\s*Geb[äa]ude\s+\d+\s*\(([^)]+)\)/gi;
+    const matches = [...text.matchAll(headerPattern)];
 
-    if (addressMatches.length === 0) {
-      // Fallback: try generic street pattern
-      const simplePattern = /Straße[:\s]+(.+?),?\s+(\d+)/gi;
-      const simpleMatches = [...text.matchAll(simplePattern)];
-      if (simpleMatches.length > 0) {
-        const m = simpleMatches[0];
-        buildings.push(this.buildBuildingFromMatch(m[1].trim(), m[2].trim(), text));
-      }
-    } else {
+    for (let i = 0; i < matches.length; i++) {
+      const buildingName = matches[i][1].trim();
+      const start = matches[i].index!;
+      const end = i + 1 < matches.length ? matches[i + 1].index! : text.length;
+      const section = text.substring(start, end);
+
+      // "an der Adresse Street HouseNum, ZIP City"
+      const addrMatch = section.match(
+        /an der Adresse\s+([A-Za-zäöüÄÖÜß\s-]+?)\s+(\d+[a-z]?),\s*(\d{5})\s+([A-Za-zäöüÄÖÜß-]+)/i,
+      );
+
+      const yearMatch = section.match(/Baujahr\s+(\d{4})/i);
+
+      // "Erdgeschoss bis N Obergeschoss" → floors = N + 1
+      const floorsMatch = section.match(/Erdgeschoss\s+(?:bis|brs)\s+(\d+)\s+Obergeschoss/i);
+
+      buildings.push({
+        name: buildingName,
+        street: addrMatch?.[1]?.trim() || "",
+        houseNumber: addrMatch?.[2] || "",
+        zipCode: addrMatch?.[3] || "",
+        city: addrMatch?.[4]?.trim() || "",
+        constructionYear: yearMatch ? parseInt(yearMatch[1]) : 0,
+        floors: floorsMatch ? parseInt(floorsMatch[1]) + 1 : 0,
+      });
+    }
+
+    // Fallback: find addresses directly if no building sections found
+    if (buildings.length === 0) {
+      const addressPattern =
+        /an der Adresse\s+([A-Za-zäöüÄÖÜß\s-]+?)\s+(\d+[a-z]?),\s*(\d{5})\s+([A-Za-zäöüÄÖÜß-]+)/gi;
       const seen = new Set<string>();
-      for (const m of addressMatches.slice(0, 5)) {
-        const key = `${m[1].trim()}|${m[2].trim()}`;
+      for (const m of text.matchAll(addressPattern)) {
+        const key = `${m[1].trim()}|${m[2]}`;
         if (!seen.has(key)) {
           seen.add(key);
-          buildings.push(this.buildBuildingFromMatch(m[1].trim(), m[2].trim(), text));
+          buildings.push({
+            name: `${m[1].trim()} ${m[2]}`,
+            street: m[1].trim(),
+            houseNumber: m[2],
+            zipCode: m[3],
+            city: m[4].trim(),
+            constructionYear: 0,
+            floors: 0,
+          });
         }
       }
     }
@@ -84,62 +127,77 @@ export class RegexParserService {
     return buildings;
   }
 
-  private buildBuildingFromMatch(street: string, houseNumber: string, text: string): BuildingData {
-    const zipCityPattern = /(\d{5})\s+([A-Za-zäöüÄÖÜß\s-]+)/;
-    const zipCityMatch = text.match(zipCityPattern);
+  // ─── Units ──────────────────────────────────────────────────────────────────
 
-    const yearPattern = /Baujahr[:\s]+(\d{4})|Errichtungsjahr[:\s]+(\d{4})/i;
-    const yearMatch = text.match(yearPattern);
-
-    const floorsPattern = /(?:Stockwerke|Etagen|Geschosse)[:\s]+(\d+)/i;
-    const floorsMatch = text.match(floorsPattern);
-
-    return {
-      name: `${street} ${houseNumber}`,
-      street,
-      houseNumber,
-      zipCode: zipCityMatch?.[1] || "",
-      city: zipCityMatch?.[2]?.trim() || "",
-      constructionYear: yearMatch ? parseInt(yearMatch[1] || yearMatch[2]) : 0,
-      floors: floorsMatch ? parseInt(floorsMatch[1]) : 0,
-    };
-  }
-
-  private parseUnits(text: string, buildings: BuildingData[]): UnitData[] {
+  private parseUnits(text: string): UnitData[] {
     const units: UnitData[] = [];
-    const buildingRef = buildings[0]?.name || "";
 
-    // Pattern for unit tables in Teilungserklärung
-    const unitPattern = /(?:Nr\.|Einheit|Wohneinheit|Einh\.)\s*(\d+[a-z]?)[\s\t]+(?:(Wohnung|Büro|Garten|Stellplatz|Parkplatz|TG)[\s\t]+)?(\d+[.,]\d+)\s*m²/gi;
-    const matches = [...text.matchAll(unitPattern)];
+    // Match numbered unit block headers: "N. Einheit(en) Nr. XX (Type)"
+    // Allow { or ( as opening bracket (OCR sometimes produces { instead of ()
+    const headerRe = /\n\d+[.,]\s+Einheit(?:en)?\s+Nr[.,]\s+([\d\s]+?(?:\s+bis\s+\d+)?)\s*[({]([^)}\n]+)[)}]/gi;
 
-    for (const match of matches) {
-      const typeRaw = match[2]?.toLowerCase() || "";
-      units.push({
-        number: match[1],
-        type: this.mapUnitType(typeRaw),
-        floor: "",
-        entrance: "",
-        sizeSqm: parseFloat(match[3].replace(",", ".")),
-        coOwnershipShare: "",
-        constructionYear: 0,
-        rooms: null,
+    interface Block { numberStr: string; typeStr: string; start: number }
+    const blocks: Block[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = headerRe.exec(text)) !== null) {
+      blocks.push({
+        numberStr: m[1].trim(),
+        typeStr: m[2].trim(),
+        start: m.index + m[0].length,
       });
     }
 
-    // Also try MEA pattern: "1/1000"
-    if (units.length === 0) {
-      const meaPattern = /(\d+[a-z]?)\s+(\d+[.,]\d+)\s*m²\s+([\d/]+)\s*(?:MEA|Tausendstel)/gi;
-      for (const match of [...text.matchAll(meaPattern)]) {
+    for (let i = 0; i < blocks.length; i++) {
+      const { numberStr, typeStr } = blocks[i];
+      const blockEnd = i + 1 < blocks.length ? blocks[i + 1].start : text.length;
+      const block = text.substring(blocks[i].start, blockEnd);
+
+      const type = this.mapUnitType(typeStr);
+
+      // MEA: "von 110,0/1.000" or "von 110,0/1 000" or "von 108,0/1.,000" (OCR noise)
+      const meaMatch = block.match(/von\s+([\d,.]+)\s*\/\s*(1[.,\s]*000)/i);
+      const coOwnershipShare = meaMatch
+        ? `${meaMatch[1].replace(",", ".")}/${meaMatch[2].replace(/[,\s]/g, "")}`
+        : "";
+
+      // Floor + Entrance from "Lage: X, Eingang Y"
+      // Use word boundary \b to avoid matching "Außenanlage" (contains "lage")
+      const lageLine = (block.match(/\bLage[:\s]+([^\n•]+)/i)?.[1] || "").trim();
+      const lageParts = lageLine.split(",");
+      const floor = this.normalizeFloor(lageParts[0]?.trim() || "");
+      // "Emgang" is a common OCR variant of "Eingang"
+      const entranceMatch = lageLine.match(/E\w{0,3}gang\s+([A-Z\d]+)/i);
+      const entrance = entranceMatch?.[1] || "";
+
+      // Size: "Größe: ca 95,00 m" (m² rendered as m? by OCR)
+      const sizeMatch = block.match(/Größe[:\s]+(?:je\s+)?ca\s+([\d,.]+)\s*m/i);
+      const sizeSqm = sizeMatch ? parseFloat(sizeMatch[1].replace(",", ".")) : 0;
+
+      // Rooms (only for Apartment / Office)
+      const roomsMatch = block.match(/Zimmer[:\s]+(\d+)\s*Zimmer/i);
+      const rooms = type === "Apartment" || type === "Office"
+        ? (roomsMatch ? parseInt(roomsMatch[1]) : null)
+        : null;
+
+      // Construction year
+      const yearMatch = block.match(/Baujahr(?:\s+der\s+Einheit)?[:\s]+(\d{4})/i);
+      const constructionYear = yearMatch ? parseInt(yearMatch[1]) : 0;
+
+      // Expand ranges like "09 bis 13"
+      const rangeMatch = numberStr.match(/(\d+)\s+bis\s+(\d+)/i);
+      if (rangeMatch) {
+        const from = parseInt(rangeMatch[1]);
+        const to = parseInt(rangeMatch[2]);
+        for (let j = from; j <= to; j++) {
+          units.push({
+            number: String(j).padStart(2, "0"),
+            type, floor, entrance, sizeSqm, coOwnershipShare, constructionYear, rooms,
+          });
+        }
+      } else {
         units.push({
-          number: match[1],
-          type: "Apartment",
-          floor: "",
-          entrance: "",
-          sizeSqm: parseFloat(match[2].replace(",", ".")),
-          coOwnershipShare: match[3],
-          constructionYear: 0,
-          rooms: null,
+          number: numberStr.padStart(2, "0"),
+          type, floor, entrance, sizeSqm, coOwnershipShare, constructionYear, rooms,
         });
       }
     }
@@ -147,20 +205,40 @@ export class RegexParserService {
     return units;
   }
 
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  private normalizeFloor(raw: string): string {
+    if (/Untergeschoss|UG\b/i.test(raw)) return "UG";
+    if (/Erdgeschoss|EG\b/i.test(raw)) return "EG";
+    const ogMatch = raw.match(/(\d+)\s*Obergeschoss/i);
+    if (ogMatch) return `${ogMatch[1]} OG`;
+    return raw.substring(0, 30).trim();
+  }
+
   private mapUnitType(raw: string): UnitData["type"] {
-    if (/büro|office/i.test(raw)) return "Office";
-    if (/garten/i.test(raw)) return "Garden";
-    if (/stellplatz|parkplatz|garage|tiefgarage|tg/i.test(raw)) return "Parking";
+    if (/büro|office|gewerbe/i.test(raw)) return "Office";
+    if (/garten|garden/i.test(raw)) return "Garden";
+    if (/stellplatz|parkplatz|garage|tiefgarage|tg|parking/i.test(raw)) return "Parking";
     return "Apartment";
   }
 
+  /** Extract first capture group, trim, strip trailing newlines. */
   private extract(text: string, patterns: RegExp[]): string {
     for (const pattern of patterns) {
       const match = text.match(pattern);
-      if (match?.[1]) return match[1].trim().replace(/\n.*/s, "").substring(0, 100);
+      if (match?.[1]) return match[1].trim().replace(/\n[\s\S]*/s, "").substring(0, 100);
     }
     return "";
   }
+
+  /** Like extract() but also strips trailing address-like suffixes. */
+  private extractCompany(text: string, patterns: RegExp[]): string {
+    const raw = this.extract(text, patterns);
+    // Remove trailing whitespace-word run that looks like a street number
+    return raw.replace(/\s+\d+.*$/, "").trim();
+  }
+
+  // ─── Confidence ─────────────────────────────────────────────────────────────
 
   private buildConfidence(
     property: PropertyData,
@@ -168,35 +246,35 @@ export class RegexParserService {
     units: UnitData[],
     _text: string,
   ): FieldConfidenceMap {
-    const propConf = (v: string | number) =>
+    const propConf = (v: string | number): FieldConfidence =>
       v && String(v).length > 0 ? "extracted" : "missing";
 
     return {
       property: {
-        name: propConf(property.name) as FieldConfidence,
-        number: propConf(property.number) as FieldConfidence,
+        name: propConf(property.name),
+        number: propConf(property.number),
         managementType: "extracted",
-        propertyManager: propConf(property.propertyManager) as FieldConfidence,
-        accountant: propConf(property.accountant) as FieldConfidence,
+        propertyManager: propConf(property.propertyManager),
+        accountant: propConf(property.accountant),
       },
       buildings: buildings.map((b) => ({
-        name: propConf(b.name) as FieldConfidence,
-        street: propConf(b.street) as FieldConfidence,
-        houseNumber: propConf(b.houseNumber) as FieldConfidence,
-        zipCode: propConf(b.zipCode) as FieldConfidence,
-        city: propConf(b.city) as FieldConfidence,
-        constructionYear: b.constructionYear > 0 ? "extracted" : ("missing" as FieldConfidence),
-        floors: b.floors > 0 ? "extracted" : ("missing" as FieldConfidence),
+        name: propConf(b.name),
+        street: propConf(b.street),
+        houseNumber: propConf(b.houseNumber),
+        zipCode: propConf(b.zipCode),
+        city: propConf(b.city),
+        constructionYear: b.constructionYear > 0 ? "extracted" : "missing",
+        floors: b.floors > 0 ? "extracted" : "missing",
       })),
       units: units.map((u) => ({
-        number: propConf(u.number) as FieldConfidence,
-        type: propConf(u.type) as FieldConfidence,
-        floor: u.floor ? "extracted" : ("missing" as FieldConfidence),
-        entrance: u.entrance ? "extracted" : ("missing" as FieldConfidence),
-        sizeSqm: u.sizeSqm > 0 ? "extracted" : ("missing" as FieldConfidence),
-        coOwnershipShare: propConf(u.coOwnershipShare) as FieldConfidence,
-        constructionYear: u.constructionYear > 0 ? "extracted" : ("missing" as FieldConfidence),
-        rooms: u.rooms !== null ? "extracted" : ("missing" as FieldConfidence),
+        number: propConf(u.number),
+        type: propConf(u.type),
+        floor: u.floor ? "extracted" : "missing",
+        entrance: u.entrance ? "extracted" : "missing",
+        sizeSqm: u.sizeSqm > 0 ? "extracted" : "missing",
+        coOwnershipShare: propConf(u.coOwnershipShare),
+        constructionYear: u.constructionYear > 0 ? "extracted" : "missing",
+        rooms: u.rooms !== null ? "extracted" : "missing",
       })),
     };
   }
