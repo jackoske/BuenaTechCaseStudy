@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Property {
+  id              Int            @id @default(autoincrement())
+  name            String
+  number          String         @unique
+  managementType  ManagementType
+  propertyManager String
+  accountant      String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  buildings       Building[]
+}
+
+model Building {
+  id               Int      @id @default(autoincrement())
+  propertyId       Int
+  property         Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name             String
+  street           String
+  houseNumber      String
+  zipCode          String
+  city             String
+  constructionYear Int
+  floors           Int
+  units            Unit[]
+}
+
+model Unit {
+  id               Int      @id @default(autoincrement())
+  buildingId       Int
+  building         Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  number           String
+  type             UnitType
+  floor            String
+  entrance         String
+  sizeSqm          Float
+  coOwnershipShare String
+  constructionYear Int
+  rooms            Int?
+}
+
+enum ManagementType {
+  WEG
+  MV
+}
+
+enum UnitType {
+  Apartment
+  Office
+  Garden
+  Parking
+}
