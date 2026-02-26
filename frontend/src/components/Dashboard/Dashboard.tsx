@@ -87,7 +87,7 @@ export function Dashboard() {
                 <TableHead className="font-medium">Name</TableHead>
                 <TableHead className="font-medium">Type</TableHead>
                 <TableHead className="font-medium">Number</TableHead>
-                <TableHead className="font-medium">Manager</TableHead>
+                <TableHead className="font-medium">Manager / Accountant</TableHead>
                 <TableHead className="font-medium text-right">Buildings</TableHead>
                 <TableHead className="font-medium text-right">Units</TableHead>
               </TableRow>
@@ -108,8 +108,17 @@ export function Dashboard() {
                   <TableCell className="font-mono text-sm text-muted-foreground">
                     {p.number}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">
-                    {p.propertyManager}
+                  <TableCell className="text-sm">
+                    {p.propertyManager && (
+                      <span className="block text-foreground" title={p.propertyManager}>
+                        {p.propertyManager}
+                      </span>
+                    )}
+                    {p.accountant && (
+                      <span className="block text-muted-foreground text-xs mt-0.5" title={p.accountant}>
+                        {p.accountant}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{p.buildingCount}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.unitCount}</TableCell>
