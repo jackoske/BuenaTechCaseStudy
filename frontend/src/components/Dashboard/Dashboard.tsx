@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Building2, RefreshCw, Search, Trash2, CheckSquare } from "lucide-react";
+import { Plus, Building2, RefreshCw, Search, Trash2, CheckSquare, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,16 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
+  // Sorting
+  type SortKey = "name" | "number" | "buildingCount" | "unitCount";
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  };
+
   // Selection / bulk delete
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -39,16 +49,25 @@ export function Dashboard() {
   const [deleting, setDeleting] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
 
-  const filtered = search.trim()
-    ? properties.filter((p) => {
-        const q = search.toLowerCase();
-        return (
-          p.name.toLowerCase().includes(q) ||
-          p.number.toLowerCase().includes(q) ||
-          p.propertyManager.toLowerCase().includes(q)
-        );
-      })
-    : properties;
+  const filtered = (
+    search.trim()
+      ? properties.filter((p) => {
+          const q = search.toLowerCase();
+          return (
+            p.name.toLowerCase().includes(q) ||
+            p.number.toLowerCase().includes(q) ||
+            p.propertyManager.toLowerCase().includes(q)
+          );
+        })
+      : properties
+  ).slice().sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (sortKey === "name") return dir * a.name.localeCompare(b.name);
+    if (sortKey === "number") return dir * a.number.localeCompare(b.number, undefined, { numeric: true });
+    if (sortKey === "buildingCount") return dir * (a.buildingCount - b.buildingCount);
+    if (sortKey === "unitCount") return dir * (a.unitCount - b.unitCount);
+    return 0;
+  });
 
   // Keep indeterminate state on the select-all checkbox
   useEffect(() => {
@@ -228,12 +247,12 @@ export function Dashboard() {
                     />
                   </TableHead>
                 )}
-                <TableHead className="font-medium">Name</TableHead>
+                <SortHead label="Name" col="name" current={sortKey} dir={sortDir} onClick={handleSort} />
                 <TableHead className="font-medium">Type</TableHead>
-                <TableHead className="font-medium">Number</TableHead>
+                <SortHead label="Number" col="number" current={sortKey} dir={sortDir} onClick={handleSort} />
                 <TableHead className="font-medium">Manager / Accountant</TableHead>
-                <TableHead className="font-medium text-right">Buildings</TableHead>
-                <TableHead className="font-medium text-right">Units</TableHead>
+                <SortHead label="Buildings" col="buildingCount" current={sortKey} dir={sortDir} onClick={handleSort} className="text-right" />
+                <SortHead label="Units" col="unitCount" current={sortKey} dir={sortDir} onClick={handleSort} className="text-right" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -302,7 +321,6 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Bulk delete confirmation */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>
           <DialogHeader>
@@ -324,5 +342,39 @@ export function Dashboard() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ── Sortable column header ────────────────────────────────────────────────────
+
+function SortHead<K extends string>({
+  label,
+  col,
+  current,
+  dir,
+  onClick,
+  className = "",
+}: {
+  label: string;
+  col: K;
+  current: K;
+  dir: "asc" | "desc";
+  onClick: (col: K) => void;
+  className?: string;
+}) {
+  const active = current === col;
+  const Icon = active ? (dir === "asc" ? ChevronUp : ChevronDown) : ChevronsUpDown;
+  return (
+    <TableHead className={className}>
+      <button
+        onClick={() => onClick(col)}
+        className={`flex items-center gap-1 font-medium hover:text-foreground transition-colors ${
+          active ? "text-foreground" : "text-muted-foreground"
+        } ${className.includes("text-right") ? "ml-auto" : ""}`}
+      >
+        {label}
+        <Icon className={`h-3.5 w-3.5 ${active ? "opacity-100" : "opacity-40"}`} />
+      </button>
+    </TableHead>
   );
 }
