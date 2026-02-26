@@ -243,7 +243,7 @@ export function PropertyDetail({ id }: Props) {
                     <TableHead className="w-24">Floor</TableHead>
                     <TableHead className="w-20">Entrance</TableHead>
                     <TableHead className="text-right w-24">Size m²</TableHead>
-                    <TableHead className="w-28">MEA</TableHead>
+                    <TableHead className="w-28" title="Miteigentumsanteil — Co-ownership share (e.g. 110/1000)">MEA ⓘ</TableHead>
                     <TableHead className="text-right w-16">Rooms</TableHead>
                     <TableHead className="w-14"></TableHead>
                   </TableRow>

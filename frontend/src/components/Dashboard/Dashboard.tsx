@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Building2, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Building2, RefreshCw, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,8 +20,21 @@ import type { PropertySummary } from "@/types/property";
 import { toast } from "sonner";
 
 export function Dashboard() {
+  const router = useRouter();
   const [properties, setProperties] = useState<PropertySummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const filtered = search.trim()
+    ? properties.filter((p) => {
+        const q = search.toLowerCase();
+        return (
+          p.name.toLowerCase().includes(q) ||
+          p.number.toLowerCase().includes(q) ||
+          p.propertyManager.toLowerCase().includes(q)
+        );
+      })
+    : properties;
 
   const load = async () => {
     setLoading(true);
@@ -39,11 +54,15 @@ export function Dashboard() {
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Properties</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {loading ? "Loading…" : `${properties.length} propert${properties.length === 1 ? "y" : "ies"}`}
+            {loading
+              ? "Loading…"
+              : search.trim()
+                ? `${filtered.length} of ${properties.length} propert${properties.length === 1 ? "y" : "ies"}`
+                : `${properties.length} propert${properties.length === 1 ? "y" : "ies"}`}
           </p>
         </div>
         <div className="flex gap-2">
@@ -59,6 +78,18 @@ export function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {!loading && properties.length > 0 && (
+        <div className="relative mb-4 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search by name, number, or manager…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-20 text-muted-foreground">
@@ -93,11 +124,18 @@ export function Dashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {properties.map((p) => (
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                    No properties match &ldquo;{search}&rdquo;
+                  </TableCell>
+                </TableRow>
+              )}
+              {filtered.map((p) => (
                 <TableRow
                   key={p.id}
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => window.location.href = `/properties/${p.id}`}
+                  onClick={() => router.push(`/properties/${p.id}`)}
                 >
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>

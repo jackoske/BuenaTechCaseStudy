@@ -82,6 +82,7 @@ interface WizardState {
     value: UnitFormData[K],
   ) => void;
   cloneUnit: (buildingIdx: number, unitIdx: number) => void;
+  moveUnit: (fromBuildingIdx: number, unitIdx: number, toBuildingIdx: number) => void;
   bulkAddUnits: (buildingIdx: number, units: UnitFormData[]) => void;
 
   // Pre-fill from extraction
@@ -203,6 +204,22 @@ export const usePropertyWizard = create<WizardState>()(
                   }
                 : b,
             ),
+          },
+        }));
+      },
+
+      moveUnit: (fromBuildingIdx, unitIdx, toBuildingIdx) => {
+        if (fromBuildingIdx === toBuildingIdx) return;
+        const unit = get().formData.buildings[fromBuildingIdx]?.units[unitIdx];
+        if (!unit) return;
+        set((s) => ({
+          formData: {
+            ...s.formData,
+            buildings: s.formData.buildings.map((b, i) => {
+              if (i === fromBuildingIdx) return { ...b, units: b.units.filter((_, j) => j !== unitIdx) };
+              if (i === toBuildingIdx) return { ...b, units: [...b.units, { ...unit }] };
+              return b;
+            }),
           },
         }));
       },

@@ -40,7 +40,7 @@ interface Props {
 }
 
 export function Step3Units({ onBack, onSubmit, submitting }: Props) {
-  const { formData, addUnit, removeUnit, updateUnit, cloneUnit, bulkAddUnits } =
+  const { formData, addUnit, removeUnit, updateUnit, cloneUnit, moveUnit, bulkAddUnits } =
     usePropertyWizard();
 
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -124,7 +124,7 @@ export function Step3Units({ onBack, onSubmit, submitting }: Props) {
               <TableHead className="w-24">Floor</TableHead>
               <TableHead className="w-20">Entrance</TableHead>
               <TableHead className="w-24">Size m²</TableHead>
-              <TableHead className="w-28">MEA</TableHead>
+              <TableHead className="w-28" title="Miteigentumsanteil — Co-ownership share (e.g. 110/1000)">MEA ⓘ</TableHead>
               <TableHead className="w-24">Year</TableHead>
               <TableHead className="w-20">Rooms</TableHead>
               <TableHead className="w-16"></TableHead>
@@ -140,6 +140,7 @@ export function Step3Units({ onBack, onSubmit, submitting }: Props) {
                   updateUnit(unit.buildingIdx, unit.unitIdx, field, value)
                 }
                 onClone={() => cloneUnit(unit.buildingIdx, unit.unitIdx)}
+                onMove={(to) => moveUnit(unit.buildingIdx, unit.unitIdx, to)}
                 onRemove={() => removeUnit(unit.buildingIdx, unit.unitIdx)}
                 canRemove={totalUnits > 1}
               />
@@ -294,6 +295,7 @@ function UnitRow({
   buildings,
   onUpdate,
   onClone,
+  onMove,
   onRemove,
   canRemove,
 }: {
@@ -301,6 +303,7 @@ function UnitRow({
   buildings: string[];
   onUpdate: (field: keyof UnitFormData, value: UnitFormData[keyof UnitFormData]) => void;
   onClone: () => void;
+  onMove: (toBuildingIdx: number) => void;
   onRemove: () => void;
   canRemove: boolean;
 }) {
@@ -338,10 +341,7 @@ function UnitRow({
       <TableCell>
         <Select
           value={String(unit.buildingIdx)}
-          onValueChange={(v) => {
-            // Moving units between buildings is complex — for simplicity, just show building name
-            void v;
-          }}
+          onValueChange={(v) => onMove(parseInt(v))}
         >
           <SelectTrigger className="h-8 text-sm w-32">
             <SelectValue placeholder={unit.buildingName} />
