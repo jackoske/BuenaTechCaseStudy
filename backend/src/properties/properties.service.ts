@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreatePropertyDto } from "./dto/create-property.dto";
+import { UpdatePropertyDto } from "./dto/update-property.dto";
+import { UpdateBuildingDto } from "./dto/update-building.dto";
+import { UpdateUnitDto } from "./dto/update-unit.dto";
 
 @Injectable()
 export class PropertiesService {
@@ -94,6 +97,24 @@ export class PropertiesService {
         },
       },
     });
+  }
+
+  async updateProperty(id: number, dto: UpdatePropertyDto) {
+    const property = await this.prisma.property.findUnique({ where: { id } });
+    if (!property) throw new NotFoundException(`Property #${id} not found`);
+    return this.prisma.property.update({ where: { id }, data: dto });
+  }
+
+  async updateBuilding(id: number, dto: UpdateBuildingDto) {
+    const building = await this.prisma.building.findUnique({ where: { id } });
+    if (!building) throw new NotFoundException(`Building #${id} not found`);
+    return this.prisma.building.update({ where: { id }, data: dto });
+  }
+
+  async updateUnit(id: number, dto: UpdateUnitDto) {
+    const unit = await this.prisma.unit.findUnique({ where: { id } });
+    if (!unit) throw new NotFoundException(`Unit #${id} not found`);
+    return this.prisma.unit.update({ where: { id }, data: dto });
   }
 
   async remove(id: number) {
