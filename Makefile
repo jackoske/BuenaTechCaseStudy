@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend install seed db-migrate db-reset help
+.PHONY: dev backend frontend install seed db-migrate db-reset kill restart help
 
 # Default target
 .DEFAULT_GOAL := help
@@ -27,6 +27,12 @@ db-migrate: ## Run database migrations
 
 db-reset: ## Reset database and re-seed
 	cd backend && npx prisma migrate reset --force
+
+kill: ## Kill processes on :3000 and :3001
+	@fuser -k 3001/tcp 2>/dev/null && echo "Killed :3001" || echo ":3001 already free"
+	@fuser -k 3000/tcp 2>/dev/null && echo "Killed :3000" || echo ":3000 already free"
+
+restart: kill dev ## Kill existing processes then start fresh
 
 build: ## Build both for production
 	cd backend && npm run build
