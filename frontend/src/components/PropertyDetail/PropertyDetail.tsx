@@ -139,10 +139,10 @@ export function PropertyDetail({ id }: Props) {
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <div className="flex items-center gap-4 mb-8">
-        <Link href="/">
+        <Link href="/properties">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Dashboard
+            Properties
           </Button>
         </Link>
       </div>
@@ -196,7 +196,7 @@ export function PropertyDetail({ id }: Props) {
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
                 {item.label}
               </p>
-              <p className="font-medium text-sm truncate">{item.value}</p>
+              <p className="font-medium text-sm break-words" title={String(item.value)}>{item.value}</p>
             </CardContent>
           </Card>
         ))}
