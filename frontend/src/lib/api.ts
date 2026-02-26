@@ -47,9 +47,10 @@ export const propertiesApi = {
 };
 
 export const extractionApi = {
-  upload: async (file: File): Promise<ExtractionResponse> => {
+  upload: async (file: File, method = "auto"): Promise<ExtractionResponse> => {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("method", method);
     const res = await api.post<ExtractionResponse>("/extraction/upload", formData, {
       headers: { "Content-Type": undefined },
     });

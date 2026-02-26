@@ -111,6 +111,7 @@ export interface ExtractionResponse {
   extraction: ExtractionData | null;
   extractionMethod: string | null;
   overallConfidence: number;
+  isTextPdf: boolean;
   duplicates: DuplicateMatch[];
   error?: string;
 }

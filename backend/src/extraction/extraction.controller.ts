@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Post,
   UploadedFile,
@@ -7,7 +8,9 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
-import { ExtractionService } from "./extraction.service";
+import { ExtractionService, ExtractionMethod } from "./extraction.service";
+
+const VALID_METHODS: ExtractionMethod[] = ["auto", "regex", "openai", "gemini", "ollama"];
 
 @Controller("extraction")
 export class ExtractionController {
@@ -26,10 +29,19 @@ export class ExtractionController {
       },
     }),
   )
-  async upload(@UploadedFile() file: Express.Multer.File) {
+  async upload(
+    @UploadedFile() file: Express.Multer.File,
+    @Body("method") method?: string,
+  ) {
     if (!file) {
       throw new BadRequestException("No file uploaded. Please upload a PDF.");
     }
-    return this.extractionService.extractFromPdf(file.buffer);
+
+    const resolvedMethod: ExtractionMethod =
+      method && VALID_METHODS.includes(method as ExtractionMethod)
+        ? (method as ExtractionMethod)
+        : "auto";
+
+    return this.extractionService.extractFromPdf(file.buffer, resolvedMethod);
   }
 }

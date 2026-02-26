@@ -3,10 +3,14 @@ import { PdfReaderService } from "./parsers/pdf-reader.service";
 import { RegexParserService } from "./parsers/regex-parser.service";
 import { OpenAiParserService } from "./parsers/openai-parser.service";
 import { GeminiParserService } from "./parsers/gemini-parser.service";
+import { OllamaParserService } from "./parsers/ollama-parser.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ParseResult } from "./interfaces/parser.interface";
 
 const CONFIDENCE_THRESHOLD = 0.5;
+const TEXT_PDF_MIN_LENGTH = 200;
+
+export type ExtractionMethod = "auto" | "regex" | "openai" | "gemini" | "ollama";
 
 export interface DuplicateMatch {
   id: number;
@@ -22,6 +26,7 @@ export interface ExtractionResponse {
   extraction: ParseResult["data"] | null;
   extractionMethod: string | null;
   overallConfidence: number;
+  isTextPdf: boolean;
   duplicates: DuplicateMatch[];
   error?: string;
 }
@@ -35,43 +40,102 @@ export class ExtractionService {
     private readonly regexParser: RegexParserService,
     private readonly openAiParser: OpenAiParserService,
     private readonly geminiParser: GeminiParserService,
+    private readonly ollamaParser: OllamaParserService,
     private readonly prisma: PrismaService,
   ) {}
 
-  async extractFromPdf(buffer: Buffer): Promise<ExtractionResponse> {
+  async extractFromPdf(buffer: Buffer, method: ExtractionMethod = "auto"): Promise<ExtractionResponse> {
     // Step 1: Extract text
     const text = await this.pdfReader.extractText(buffer);
-    if (!text || text.length < 20) {
+    const isTextPdf = text.length >= TEXT_PDF_MIN_LENGTH;
+
+    if (!isTextPdf) {
       return {
         extraction: null,
         extractionMethod: null,
         overallConfidence: 0,
+        isTextPdf: false,
         duplicates: [],
-        error: "Could not extract text from PDF. Please enter details manually.",
+        error:
+          "Scanned / image-only PDF detected — no readable text found. " +
+          "AI text parsers require extractable text. Please enter details manually.",
       };
     }
 
-    // Step 2: Try regex
-    let result: ParseResult | null = this.regexParser.parse(text);
+    // Step 2: Run the selected parser (or auto-fallback chain)
+    let result: ParseResult | null = null;
 
-    // Step 3: If regex confidence too low, try OpenAI
-    if (!result || result.confidence < CONFIDENCE_THRESHOLD) {
-      this.logger.log(`Regex confidence ${result?.confidence.toFixed(2) || "N/A"}, trying OpenAI`);
+    if (method === "regex") {
+      result = this.regexParser.parse(text);
+    } else if (method === "openai") {
       if (this.openAiParser.isAvailable()) {
-        const openAiResult = await this.openAiParser.parse(text);
-        if (openAiResult && openAiResult.confidence >= CONFIDENCE_THRESHOLD) {
-          result = openAiResult;
+        result = await this.openAiParser.parse(text);
+      } else {
+        return {
+          extraction: null,
+          extractionMethod: null,
+          overallConfidence: 0,
+          isTextPdf,
+          duplicates: [],
+          error: "OpenAI parser is not configured. Set OPENAI_API_KEY in backend/.env.",
+        };
+      }
+    } else if (method === "gemini") {
+      if (this.geminiParser.isAvailable()) {
+        result = await this.geminiParser.parse(text);
+      } else {
+        return {
+          extraction: null,
+          extractionMethod: null,
+          overallConfidence: 0,
+          isTextPdf,
+          duplicates: [],
+          error: "Gemini parser is not configured. Set GEMINI_API_KEY in backend/.env.",
+        };
+      }
+    } else if (method === "ollama") {
+      if (this.ollamaParser.isAvailable()) {
+        result = await this.ollamaParser.parse(text);
+      } else {
+        return {
+          extraction: null,
+          extractionMethod: null,
+          overallConfidence: 0,
+          isTextPdf,
+          duplicates: [],
+          error: "Ollama parser is not configured. Set OLLAMA_BASE_URL in backend/.env.",
+        };
+      }
+    } else {
+      // Auto fallback chain: regex → Gemini → Ollama (optional, local)
+      // Note: OpenAI is wired up but not tested — no OPENAI_API_KEY available.
+      //       Gemini is the primary AI fallback (set GEMINI_API_KEY in .env).
+      //       Ollama is optional local AI (set OLLAMA_BASE_URL if running locally).
+      result = this.regexParser.parse(text);
+      this.logger.log(`Regex confidence: ${result?.confidence.toFixed(2) ?? "N/A"}`);
+
+      if (!result || result.confidence < CONFIDENCE_THRESHOLD) {
+        if (this.geminiParser.isAvailable()) {
+          this.logger.log("Regex confidence below threshold, trying Gemini");
+          const r = await this.geminiParser.parse(text);
+          if (r && r.confidence >= CONFIDENCE_THRESHOLD) result = r;
         }
       }
-    }
 
-    // Step 4: If still low, try Gemini
-    if (!result || result.confidence < CONFIDENCE_THRESHOLD) {
-      this.logger.log(`Trying Gemini fallback`);
-      if (this.geminiParser.isAvailable()) {
-        const geminiResult = await this.geminiParser.parse(text);
-        if (geminiResult) {
-          result = geminiResult;
+      // Ollama: optional local AI fallback — only runs if OLLAMA_BASE_URL is set
+      if (!result || result.confidence < CONFIDENCE_THRESHOLD) {
+        if (this.ollamaParser.isAvailable()) {
+          this.logger.log("Trying Ollama local AI fallback");
+          const r = await this.ollamaParser.parse(text);
+          if (r) result = r;
+        }
+      }
+
+      if (!result || result.confidence < CONFIDENCE_THRESHOLD) {
+        if (this.ollamaParser.isAvailable()) {
+          this.logger.log("Trying Ollama fallback");
+          const r = await this.ollamaParser.parse(text);
+          if (r) result = r;
         }
       }
     }
@@ -81,18 +145,20 @@ export class ExtractionService {
         extraction: null,
         extractionMethod: null,
         overallConfidence: 0,
+        isTextPdf,
         duplicates: [],
         error: "Extraction unsuccessful. Please enter details manually.",
       };
     }
 
-    // Step 5: Duplicate detection
+    // Step 3: Duplicate detection
     const duplicates = await this.checkDuplicates(result);
 
     return {
       extraction: result.data,
       extractionMethod: result.method,
       overallConfidence: result.confidence,
+      isTextPdf,
       duplicates,
     };
   }
@@ -118,13 +184,11 @@ export class ExtractionService {
         unitCount,
       };
 
-      // Exact: property number matches
       if (property.number && existing.number === property.number) {
         duplicates.push({ ...base, matchType: "exact" });
         continue;
       }
 
-      // Potential: name similarity
       if (property.name && this.similarity(existing.name, property.name) > 0.7) {
         duplicates.push({ ...base, matchType: "potential" });
       }
