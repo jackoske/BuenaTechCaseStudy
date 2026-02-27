@@ -23,7 +23,7 @@ services:
 
   backend:
     build:
-      context: /srv/buena/buena-property-management/backend
+      context: ./backend
     environment:
       DATABASE_URL: postgresql://buena:${POSTGRES_PASSWORD}@postgres:5432/buena_properties
       FRONTEND_URL: ${FRONTEND_URL}
@@ -45,7 +45,7 @@ services:
 
   frontend:
     build:
-      context: /srv/buena/buena-property-management/frontend
+      context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: /api
     environment:
