@@ -123,6 +123,12 @@ Scanned / image-only PDFs return a clear error — AI text parsers require extra
 
 ---
 
+## Architecture & tradeoffs
+
+See [`docs/architecture.md`](docs/architecture.md) for an honest assessment of what's wrong with this architecture and what a production system would look like — covering extraction pipeline design, async job queues, observability, schema limitations, and more.
+
+---
+
 ## Out of scope for this demo
 
 The following are real product concerns but were intentionally skipped to keep the scope manageable:
