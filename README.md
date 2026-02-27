@@ -3,6 +3,11 @@
 A full-stack property management prototype built as a technical case study for [Buena](https://buena.com). The core idea: import a German *Teilungserklärung* (declaration of division) PDF and have the system extract properties, buildings, and units automatically — with manual entry as a fallback.
 
 **Live demo:** [buena.jackskehan.tech](https://buena.jackskehan.tech) — password `HIREmeBUENA`
+(PLEASE DONT ABUSE MY TOKENS)
+
+**VIDEO:**
+https://www.loom.com/share/36484b23633d4dcca1e85eeb28ef3a49
+https://www.loom.com/share/afead988165240658f796b892b4b560d
 
 **Architecture & tradeoffs:** [`docs/architecture.md`](docs/architecture.md) — honest assessment of what's wrong with this and what production would look like.
 
