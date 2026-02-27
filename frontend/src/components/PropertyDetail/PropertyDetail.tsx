@@ -395,18 +395,19 @@ export function PropertyDetail({ id }: Props) {
                   </div>
                 )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/20">
-                      <UnitSortHead label="Unit #" colKey="number" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="w-20" />
-                      <UnitSortHead label="Type" colKey="type" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="w-32" />
-                      <UnitSortHead label="Floor" colKey="floor" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="w-24" />
+                      <UnitSortHead label="Unit #" colKey="number" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="w-[4.5rem]" />
+                      <UnitSortHead label="Type" colKey="type" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="w-28" />
+                      <UnitSortHead label="Floor" colKey="floor" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="" />
                       <UnitSortHead label="Entrance" colKey="entrance" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="w-20" />
-                      <UnitSortHead label="Size m²" colKey="sizeSqm" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="text-right w-24" />
+                      <UnitSortHead label="Size m²" colKey="sizeSqm" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="text-right w-20" />
                       <UnitSortHead label="MEA ⓘ" colKey="coOwnershipShare" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="w-28" title="Miteigentumsanteil — Co-ownership share (e.g. 110/1000)" />
                       <UnitSortHead label="Rooms" colKey="rooms" buildingId={building.id} sort={sort} onToggle={toggleUnitSort} className="text-right w-16" />
-                      <TableHead className="w-20"></TableHead>
+                      <TableHead className="w-16"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -474,21 +475,24 @@ export function PropertyDetail({ id }: Props) {
                     )}
                   </TableBody>
                 </Table>
+                </div>
 
                 {/* ── Add unit button ── */}
                 {addingUnitBuildingId !== building.id && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 text-muted-foreground hover:text-foreground text-xs"
-                    onClick={() => {
-                      setAddingUnitBuildingId(building.id);
-                      setUnitTypeFilter((f) => ({ ...f, [building.id]: "all" }));
-                    }}
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Add Unit
-                  </Button>
+                  <div className="px-4 py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground text-xs"
+                      onClick={() => {
+                        setAddingUnitBuildingId(building.id);
+                        setUnitTypeFilter((f) => ({ ...f, [building.id]: "all" }));
+                      }}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Add Unit
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>

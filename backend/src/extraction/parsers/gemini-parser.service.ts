@@ -29,6 +29,44 @@ export class GeminiParserService {
     return !!this.client;
   }
 
+  /** Parse a scanned / image-only PDF by sending the raw bytes to Gemini Vision */
+  async parseBuffer(buffer: Buffer): Promise<ParseResult | null> {
+    if (!this.client) {
+      this.logger.warn("Gemini API key not set, skipping");
+      return null;
+    }
+
+    try {
+      const model = this.client.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      const result = await model.generateContent([
+        EXTRACTION_PROMPT,
+        {
+          inlineData: {
+            mimeType: "application/pdf",
+            data: buffer.toString("base64"),
+          },
+        },
+      ]);
+
+      const content = result.response.text().replace(/```json\n?|```/g, "").trim();
+      const parsed = JSON.parse(content) as ExtractionResult;
+      const confidence = this.scoreResult(parsed);
+      const fieldConfidence = this.buildFieldConfidence(parsed);
+
+      this.logger.log(`Gemini PDF (vision) extraction: confidence ${confidence.toFixed(2)}, ${parsed.units?.length || 0} units`);
+
+      return {
+        data: { ...parsed, fieldConfidence },
+        confidence,
+        method: "gemini",
+      };
+    } catch (err) {
+      this.logger.error("Gemini PDF vision extraction failed", err);
+      return null;
+    }
+  }
+
   async parse(text: string): Promise<ParseResult | null> {
     if (!this.client) {
       this.logger.warn("Gemini API key not set, skipping");

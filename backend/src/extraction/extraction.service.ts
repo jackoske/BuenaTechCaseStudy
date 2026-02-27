@@ -49,21 +49,53 @@ export class ExtractionService {
     const text = await this.pdfReader.extractText(buffer);
     const isTextPdf = text.length >= TEXT_PDF_MIN_LENGTH;
 
-    if (!isTextPdf) {
-      return {
-        extraction: null,
-        extractionMethod: null,
-        overallConfidence: 0,
-        isTextPdf: false,
-        duplicates: [],
-        error:
-          "Scanned / image-only PDF detected — no readable text found. " +
-          "AI text parsers require extractable text. Please enter details manually.",
-      };
-    }
-
     // Step 2: Run the selected parser (or auto-fallback chain)
     let result: ParseResult | null = null;
+
+    // Scanned PDFs: only Gemini Vision can handle them (sends raw PDF bytes)
+    if (!isTextPdf) {
+      const canUseGemini =
+        this.geminiParser.isAvailable() &&
+        (method === "auto" || method === "gemini");
+
+      if (!canUseGemini) {
+        return {
+          extraction: null,
+          extractionMethod: null,
+          overallConfidence: 0,
+          isTextPdf: false,
+          duplicates: [],
+          error:
+            "Scanned / image-only PDF detected — no readable text found. " +
+            (method === "regex" || method === "ollama" || method === "openai"
+              ? "Switch to Gemini or Auto parser to process this PDF."
+              : "Set GEMINI_API_KEY to enable AI vision extraction for scanned PDFs."),
+        };
+      }
+
+      this.logger.log("Scanned PDF detected — sending to Gemini Vision");
+      result = await this.geminiParser.parseBuffer(buffer);
+
+      if (!result || result.confidence < CONFIDENCE_THRESHOLD) {
+        return {
+          extraction: null,
+          extractionMethod: null,
+          overallConfidence: 0,
+          isTextPdf: false,
+          duplicates: [],
+          error: "Gemini Vision could not extract data from this scanned PDF. Please enter details manually.",
+        };
+      }
+
+      const duplicates = await this.checkDuplicates(result);
+      return {
+        extraction: result.data,
+        extractionMethod: result.method,
+        overallConfidence: result.confidence,
+        isTextPdf: false,
+        duplicates,
+      };
+    }
 
     if (method === "regex") {
       result = this.regexParser.parse(text);

@@ -88,9 +88,9 @@ export function PdfUploadPage() {
     setError(null);
     const detected = await detectPdfType(f);
     setPdfType(detected);
-    // Suggest AI for scanned PDFs
+    // Gemini Vision can read scanned PDFs directly — switch to it automatically
     if (detected === "scanned" && method === "auto") {
-      setMethod("ollama");
+      setMethod("gemini");
     }
   }, [method]);
 
@@ -252,7 +252,7 @@ export function PdfUploadPage() {
                       Scanned PDF
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      No extractable text — AI parser or manual entry recommended
+                      No extractable text — Gemini Vision will read the images directly
                     </span>
                   </>
                 )}
