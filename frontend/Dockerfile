@@ -11,6 +11,10 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL=/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+# Backend URL for Next.js rewrite destination (also baked at build time)
+ARG BACKEND_URL=http://localhost:3001
+ENV BACKEND_URL=$BACKEND_URL
+
 RUN npm run build
 
 # ---
