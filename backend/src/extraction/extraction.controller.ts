@@ -7,6 +7,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { Throttle } from "@nestjs/throttler";
 import { memoryStorage } from "multer";
 import { ExtractionService, ExtractionMethod } from "./extraction.service";
 
@@ -16,6 +17,7 @@ const VALID_METHODS: ExtractionMethod[] = ["auto", "regex", "openai", "gemini", 
 export class ExtractionController {
   constructor(private readonly extractionService: ExtractionService) {}
 
+  @Throttle({ default: { ttl: 60_000, limit: 10 } }) // 10 PDF uploads/min
   @Post("upload")
   @UseInterceptors(
     FileInterceptor("file", {

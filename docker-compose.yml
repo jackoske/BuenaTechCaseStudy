@@ -50,6 +50,8 @@ services:
         NEXT_PUBLIC_API_URL: /api
     environment:
       BACKEND_URL: http://backend:3001
+      AUTH_PASSWORD: ${AUTH_PASSWORD}
+      AUTH_SECRET: ${AUTH_SECRET}
     ports:
       - "127.0.0.1:3004:3000"
     depends_on:
