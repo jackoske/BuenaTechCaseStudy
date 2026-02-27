@@ -36,7 +36,7 @@ export class GeminiParserService {
     }
 
     try {
-      const model = this.client.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = this.client.getGenerativeModel({ model: "gemini-2.5-flash" });
       const truncatedText = text.substring(0, 10000);
 
       const result = await model.generateContent([

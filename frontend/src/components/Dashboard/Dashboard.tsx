@@ -155,22 +155,22 @@ export function Dashboard() {
                 : `${properties.length} propert${properties.length === 1 ? "y" : "ies"}`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {!selectMode ? (
             <>
               <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
               {properties.length > 0 && (
                 <Button variant="outline" size="sm" onClick={toggleSelectMode}>
-                  <CheckSquare className="h-4 w-4 mr-2" />
+                  <CheckSquare className="h-4 w-4" />
                   Select
                 </Button>
               )}
               <Link href="/properties/new">
                 <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-4 w-4" />
                   Create New
                 </Button>
               </Link>

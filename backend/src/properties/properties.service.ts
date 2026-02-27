@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreatePropertyDto } from "./dto/create-property.dto";
+import { CreateBuildingDto } from "./dto/create-building.dto";
 import { UpdatePropertyDto } from "./dto/update-property.dto";
 import { UpdateBuildingDto } from "./dto/update-building.dto";
 import { UpdateUnitDto } from "./dto/update-unit.dto";
+import { CreateUnitDto } from "./dto/create-unit.dto";
 
 @Injectable()
 export class PropertiesService {
@@ -105,16 +107,65 @@ export class PropertiesService {
     return this.prisma.property.update({ where: { id }, data: dto });
   }
 
+  async createBuilding(dto: CreateBuildingDto) {
+    const property = await this.prisma.property.findUnique({ where: { id: dto.propertyId } });
+    if (!property) throw new NotFoundException(`Property #${dto.propertyId} not found`);
+    return this.prisma.building.create({
+      data: {
+        propertyId: dto.propertyId,
+        name: dto.name,
+        street: dto.street,
+        houseNumber: dto.houseNumber,
+        zipCode: dto.zipCode,
+        city: dto.city,
+        constructionYear: dto.constructionYear,
+        floors: dto.floors,
+      },
+      include: { units: true },
+    });
+  }
+
   async updateBuilding(id: number, dto: UpdateBuildingDto) {
     const building = await this.prisma.building.findUnique({ where: { id } });
     if (!building) throw new NotFoundException(`Building #${id} not found`);
     return this.prisma.building.update({ where: { id }, data: dto });
   }
 
+  async deleteBuilding(id: number) {
+    const building = await this.prisma.building.findUnique({ where: { id } });
+    if (!building) throw new NotFoundException(`Building #${id} not found`);
+    // Units are cascade-deleted by the DB (onDelete: Cascade in schema)
+    return this.prisma.building.delete({ where: { id } });
+  }
+
+  async createUnit(dto: CreateUnitDto) {
+    const building = await this.prisma.building.findUnique({ where: { id: dto.buildingId } });
+    if (!building) throw new NotFoundException(`Building #${dto.buildingId} not found`);
+    return this.prisma.unit.create({
+      data: {
+        buildingId: dto.buildingId,
+        number: dto.number,
+        type: dto.type,
+        floor: dto.floor,
+        entrance: dto.entrance,
+        sizeSqm: dto.sizeSqm,
+        coOwnershipShare: dto.coOwnershipShare,
+        constructionYear: dto.constructionYear,
+        rooms: dto.rooms ?? null,
+      },
+    });
+  }
+
   async updateUnit(id: number, dto: UpdateUnitDto) {
     const unit = await this.prisma.unit.findUnique({ where: { id } });
     if (!unit) throw new NotFoundException(`Unit #${id} not found`);
     return this.prisma.unit.update({ where: { id }, data: dto });
+  }
+
+  async deleteUnit(id: number) {
+    const unit = await this.prisma.unit.findUnique({ where: { id } });
+    if (!unit) throw new NotFoundException(`Unit #${id} not found`);
+    return this.prisma.unit.delete({ where: { id } });
   }
 
   async remove(id: number) {
