@@ -8,10 +8,11 @@ A full-stack property management prototype built as a technical case study for [
 
 | Layer | Tech |
 |---|---|
-| Frontend | Next.js 14 (App Router), Tailwind CSS v4, shadcn/ui, Zustand |
+| Frontend | Next.js 16 (App Router), Tailwind CSS v4, shadcn/ui, Zustand |
 | Backend | NestJS 11, Prisma 7, PostgreSQL |
 | Extraction | Regex parser → Gemini fallback → Ollama (optional local AI) |
 | Styling | Buena brand palette — dark mode default, light/dark toggle |
+| Deployment | Docker + docker-compose, Dockge UI |
 
 ---
 
@@ -21,24 +22,36 @@ A full-stack property management prototype built as a technical case study for [
 
 ```bash
 # 1. Install dependencies
-cd backend && npm install
-cd ../frontend && npm install
+make install
 
 # 2. Configure backend environment
 cp backend/.env.example backend/.env
-# Edit DATABASE_URL, and optionally GEMINI_API_KEY
+# Edit DATABASE_URL — set your local Postgres credentials
+# Optionally add GEMINI_API_KEY for AI extraction
 
 # 3. Set up the database
-cd backend
-npx prisma migrate dev
-npx prisma db seed        # optional sample data
+make db-migrate
+make seed          # optional sample data
 
-# 4. Start both servers (from repo root)
-make dev                  # runs backend :3001 + frontend :3000
+# 4. Start both servers
+make dev           # backend :3001 + frontend :3000
 ```
 
 Backend: `http://localhost:3001/api`
 Frontend: `http://localhost:3000`
+
+> **Auth in local dev:** Password protection is disabled when `AUTH_SECRET` is not set — the app opens directly. Auth only activates in production when the env vars are configured.
+
+### Test PDFs
+
+Sample PDFs for testing extraction are in `test_pdfs/` (regenerate any time with `python3 generate_test_pdfs.py`):
+
+| File | Type | Expected result |
+|---|---|---|
+| `*_text.pdf` | Native text | Regex extracts at ~0.93+ confidence |
+| `*_scanned.pdf` | Image only | "Scanned PDF" warning, manual entry prompt |
+
+The original `test_declaration of division.pdf` in the root is the reference document the regex parser was tuned against.
 
 ---
 
@@ -98,7 +111,7 @@ Scanned / image-only PDFs return a clear error — AI text parsers require extra
 
 ### Medium priority
 - [ ] **Pagination** on the properties list for large portfolios
-- [ ] **Sorting** — click column headers to sort by name, type, unit count etc.
+- [x] **Sorting** — click column headers to sort by name, type, unit count etc.
 - [ ] **CSV / PDF export** for reporting
 - [ ] **Audit log / edit history** — track who changed what and when
 
@@ -114,14 +127,12 @@ Scanned / image-only PDFs return a clear error — AI text parsers require extra
 
 The following are real product concerns but were intentionally skipped to keep the scope manageable:
 
-- **Authentication & authorisation** — no user accounts, no role-based access (admin vs. read-only manager)
+- **Authentication & authorisation** — single shared password gate only; no user accounts, no role-based access (admin vs. read-only manager)
 - **Multi-tenancy** — single-tenant data model; no concept of organisations or teams
-- **Production deployment** — no Docker, no CI/CD, no environment-specific config beyond `.env`
 - **Tests** — no unit or e2e tests written (NestJS and Next.js test scaffolding is present but unused)
 - **Accessibility** — basic semantic HTML only; no full WCAG audit
 - **Internationalisation** — UI is English-only; data is German-centric (field names, document format)
 - **Error monitoring** — no Sentry / logging service integration
-- **Rate limiting / security hardening** — no rate limiter, no helmet, CORS is open for local dev
 
 ---
 
