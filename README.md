@@ -2,6 +2,10 @@
 
 A full-stack property management prototype built as a technical case study for [Buena](https://buena.com). The core idea: import a German *Teilungserklärung* (declaration of division) PDF and have the system extract properties, buildings, and units automatically — with manual entry as a fallback.
 
+**Live demo:** [buena.jackskehan.tech](https://buena.jackskehan.tech) — password `HIREmeBUENA`
+
+**Architecture & tradeoffs:** [`docs/architecture.md`](docs/architecture.md) — honest assessment of what's wrong with this and what production would look like.
+
 ---
 
 ## Stack
@@ -120,12 +124,6 @@ Scanned / image-only PDFs return a clear error — AI text parsers require extra
 - [ ] **Undo** for inline edits on the property detail page
 - [ ] **Unit floor plan upload** — attach images or PDFs to individual units
 - [ ] **Tenant / lease tracking** — link units to tenants with lease start/end dates
-
----
-
-## Architecture & tradeoffs
-
-See [`docs/architecture.md`](docs/architecture.md) for an honest assessment of what's wrong with this architecture and what a production system would look like — covering extraction pipeline design, async job queues, observability, schema limitations, and more.
 
 ---
 
