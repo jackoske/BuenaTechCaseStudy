@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 export async function login(_: unknown, formData: FormData) {
   const password = formData.get("password") as string;
 
-  if (password && password === process.env.AUTH_PASSWORD) {
+  if (password && (password === process.env.AUTH_PASSWORD || !process.env.AUTH_PASSWORD)) {
     const cookieStore = await cookies();
     cookieStore.set("buena_auth", process.env.AUTH_SECRET!, {
       httpOnly: true,
